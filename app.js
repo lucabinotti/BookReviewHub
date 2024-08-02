@@ -60,18 +60,19 @@ async function fetchBooks(isbns)
         let cover_path;
         if(book.cover !== undefined)
         {
-            cover_path = `images/covers/isbn${isbn.slice(5)}.jpg`;
-            await downloadImage(book.cover.large, 'public/' + cover_path);
+            cover_path = `/images/covers/isbn${isbn.slice(5)}.jpg`;
+            await downloadImage(book.cover.large, 'public' + cover_path);
         }
         else
         {
-            cover_path = 'images/covers/default.jpg'
+            cover_path = '/images/covers/default.jpg'
         }
         books[isbn.slice(5)] = {
             isbn: isbn.slice(5),
             title: book.title,
             authors: book.authors.map(author => author.name).join(', '),
             publish_date: book.publish_date,
+            publishers: book.publishers.map(publisher => publisher.name).join(', '),
             cover_path: cover_path
         };
     }
@@ -103,15 +104,27 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/books/:bookId', async (req, res) => {
-    const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${req.params.bookId}&jscmd=data&format=json`, {
-        method: 'GET',
-        headers: {'User-Agent': 'MyAppName/1.0'}
-    });
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
+    let book;
+    const queriedBooks = await getBooks([req.params.bookId]);
+
+    // Se è un nuovo libro non ancora presente nel db
+    if(Object.keys(queriedBooks).length === 0)
+    {
+        const books = await fetchBooks([req.params.bookId]);
+        if(Object.keys(books).length !== 0) insertBooks(books);
+        book = books[req.params.bookId];
     }
-    const fetchedData = await response.json();
-    const fetchedBook = fetchedData[`ISBN:${req.params.bookId}`];
+    else book = queriedBooks[req.params.bookId];
+
+    // const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${req.params.bookId}&jscmd=data&format=json`, {
+    //     method: 'GET',
+    //     headers: {'User-Agent': 'MyAppName/1.0'}
+    // });
+    // if (!response.ok) {
+    //     throw new Error('Network response was not ok');
+    // }
+    // const fetchedData = await response.json();
+    // const fetchedBook = fetchedData[`ISBN:${req.params.bookId}`];
     // res.json({
     //     isbn: req.params.bookId,
     //     title: book.title,
@@ -119,14 +132,15 @@ app.get('/books/:bookId', async (req, res) => {
     //     publish_date: book.publish_date,
     //     cover: book.cover
     // });
-    const book = {
-        isbn: req.params.bookId,
-        title: fetchedBook.title,
-        authors: fetchedBook.authors.map(author => author.name),
-        publish_date: fetchedBook.publish_date,
-        cover: fetchedBook.cover !== undefined ? fetchedBook.cover.large : '/images/covers/default.jpg',
-        publishers: fetchedBook.publishers.map(publisher => publisher.name)
-    };
+    // const book = {
+    //     isbn: req.params.bookId,
+    //     title: fetchedBook.title,
+    //     authors: fetchedBook.authors.map(author => author.name),
+    //     publish_date: fetchedBook.publish_date,
+    //     cover: fetchedBook.cover !== undefined ? fetchedBook.cover.large : '/images/covers/default.jpg',
+    //     publishers: fetchedBook.publishers.map(publisher => publisher.name)
+    // };
+
     res.render(path.join(__dirname, 'views/book.ejs'), {book, reviews: [
              {
                  username: 'Username1',
@@ -166,7 +180,6 @@ app.get('/users/:userId', (req, res) => {
 });
 
 app.post('/users/:userId', (req, res) => {
-    console.log('Pulcina: ', req.params.userId);
     db.run('INSERT INTO User (user_id) VALUES (?)', req.params.userId);
     res.status(201).send('Risorsa inserita');
 });

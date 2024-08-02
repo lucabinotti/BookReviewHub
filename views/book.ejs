@@ -46,11 +46,11 @@
     <div class="col-12">
       <h2 class="my-4"><%= book.title %></h2>
       <p>
-        <strong><%= book.authors.length > 1 ? 'Autori' : 'Autore' %>:</strong> <%= book.authors.join(', ') %><br>
-        <strong><%= book.publishers.length > 1 ? 'Editori' : 'Editore' %>:</strong> <%= book.publishers.join(', ') %><br>
+        <strong><%= book.authors.includes(', ') ? 'Autori' : 'Autore' %>:</strong> <%= book.authors %><br>
+        <strong><%= book.publishers.includes(', ') ? 'Editori' : 'Editore' %>:</strong> <%= book.publishers %><br>
         <strong>Data di pubblicazione:</strong> <%= book.publish_date %>
       </p>
-      <img src="<%= book.cover %>" class="img-fluid mb-4" alt="Copertina Libro">
+      <img src="<%= book.cover_path %>" class="img-fluid mb-4" alt="Copertina <%= book.title %>">
       <h3>Recensioni</h3>
       <% if (reviews.length === 0) { %>
         <p>Non ci sono ancora recensioni per questo libro.</p>
