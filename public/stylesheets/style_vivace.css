@@ -1,0 +1,40 @@
+body {
+  background-color: #fafafa;
+  color: #333333;
+  font-family: 'Comic Sans MS', sans-serif;
+}
+
+.navbar {
+  background-color: #ff9800;
+}
+
+.navbar-brand img {
+  height: 40px;
+}
+
+.navbar-nav .nav-link {
+  color: #ffffff !important;
+}
+
+.jumbotron {
+  background-color: #ffc107;
+  color: #333333;
+}
+
+.card {
+  background-color: #ffffff;
+  border: 1px solid #ff9800;
+}
+
+.card-title {
+  color: #ff9800;
+}
+
+.breadcrumb {
+  background-color: #ffc107;
+}
+
+.footer {
+  background-color: #ff9800;
+  height: 50px;
+}

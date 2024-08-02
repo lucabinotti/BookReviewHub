@@ -1,0 +1,32 @@
+body {
+  background-color: #f8f9fa;
+}
+
+footer {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+
+.navbar-brand img {
+  height: 40px;
+}
+
+.book-cover, .card-img-top {
+  height: 200px;
+  width: auto;
+}
+
+.review {
+  margin-bottom: 1.5rem;
+}
+
+.breadcrumb {
+  background-color: #e9ecef;
+}
+
+/* AGGIUSTARE E TOGLIERE GLI STYLE */
+.logo {
+  max-width: 40px;
+  height: auto;
+}
