@@ -5,12 +5,17 @@ const url = require('url');
 const https = require('https');
 const express = require('express');
 const path = require('path');
-const {getBooks, insertBooks} = require('./models/dao');
+const {getBooks, insertBooks, insertReview, getReviews} = require('./models/dao');
 
 
 const app = express();
 
-app.use('/images', express.static(path.join(__dirname, 'public/images')))
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
+app.use('/javascripts', express.static(path.join(__dirname, 'public/javascripts')));
+app.use('/css', express.static(path.join(__dirname, 'public/stylesheets')));
 
 
 function downloadImage(imageUrl, path) {
@@ -116,32 +121,15 @@ app.get('/books/:bookId', async (req, res) => {
     }
     else book = queriedBooks[req.params.bookId];
 
-    // const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${req.params.bookId}&jscmd=data&format=json`, {
-    //     method: 'GET',
-    //     headers: {'User-Agent': 'MyAppName/1.0'}
-    // });
-    // if (!response.ok) {
-    //     throw new Error('Network response was not ok');
-    // }
-    // const fetchedData = await response.json();
-    // const fetchedBook = fetchedData[`ISBN:${req.params.bookId}`];
-    // res.json({
-    //     isbn: req.params.bookId,
-    //     title: book.title,
-    //     authors: book.authors.map(author => author.name),
-    //     publish_date: book.publish_date,
-    //     cover: book.cover
-    // });
-    // const book = {
-    //     isbn: req.params.bookId,
-    //     title: fetchedBook.title,
-    //     authors: fetchedBook.authors.map(author => author.name),
-    //     publish_date: fetchedBook.publish_date,
-    //     cover: fetchedBook.cover !== undefined ? fetchedBook.cover.large : '/images/covers/default.jpg',
-    //     publishers: fetchedBook.publishers.map(publisher => publisher.name)
-    // };
+    const user = {connected: true, profilePicture: '/images/propic.png'};
+    const daoReviews = await getReviews(req.params.bookId);
 
-    res.render(path.join(__dirname, 'views/book.ejs'), {book, reviews: [
+    const reviews = daoReviews.map(({ user: username, date: datetime, text: comment, stars: rate }) => ({ username, datetime, comment, rate }));
+
+    res.render(path.join(__dirname, 'views/book.ejs'), {user, book, reviews});
+
+    /*
+    res.render(path.join(__dirname, 'views/book.ejs'), {user, book, reviews: [
              {
                  username: 'Username1',
                  datetime: '2023-07-24 10:30',
@@ -161,6 +149,25 @@ app.get('/books/:bookId', async (req, res) => {
                  rate: 2
              }
          ]});
+
+     */
+});
+
+app.post('/add-comment', (req, res) => {
+    const {isbn, comment, rate} = req.body;
+    // const username = req.user.username; // Assicurati che `req.user` sia popolato quando l'utente è autenticato
+
+    insertReview(isbn, Number(isbn), Number(rate), comment);
+    res.status(201).json({
+        username: Number(isbn),
+        datetime: new Date().toISOString(), // Puoi usare il formato desiderato
+        comment,
+        rate: Number(rate)
+    });
+});
+
+app.get('/login', (req, res) => {
+    res.sendFile('');
 });
 
 /* REST API di esempio

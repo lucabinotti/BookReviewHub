@@ -14,6 +14,7 @@ const db = new sqlite.Database('data/db.sqlite', (err) => {
 });
 
 db.run('CREATE TABLE IF NOT EXISTS Book (isbn VARCHAR(13) PRIMARY KEY, title VARCHAR(64) NOT NULL, authors VARCHAR(128) NOT NULL, publish_date VARCHAR(16) NOT NULL, publishers VARCHAR(128) NOT NULL, cover_path VARCHAR(64) NOT NULL);');
+db.run('CREATE TABLE IF NOT EXISTS Review (isbn VARCHAR(13), user INT UNSIGNED, stars TINYINT NOT NULL, text VARCHAR(256) DEFAULT NULL, date TEXT NOT NULL, PRIMARY KEY(isbn, user));')
 
 /**
  * Per salvare i dati fetchati dalle API nel database, gli si passa un dizionario con chiave isbn e item oggetti di questo tipo:
@@ -65,7 +66,33 @@ async function getBooks(isbns)
     });
 }
 
+function insertReview(isbn, user, stars, text)
+{
+    if(typeof isbn !== 'string' || !/^[0-9]{9}[0-9X]$/.test(isbn) && !/^[0-9]{13}$/.test(isbn)) throw new Error('Invalid ISBN');
+    if(typeof user !== 'number' || user < 0) throw new Error('Invalid user');
+    if(typeof stars !== 'number' || stars < 1 || stars > 5) throw new Error('Invalid stars');
+    if(typeof text !== 'string' || text.length > 256) throw new Error('Invalid text');
+
+    db.run('INSERT INTO Review (isbn, user, stars, text, date) VALUES (?, ?, ?, ?, ?)', [isbn, user, stars, text, new Date().toISOString()]);
+}
+
+async function getReviews(isbn)
+{
+    if(typeof isbn !== 'string' || !/^[0-9]{9}[0-9X]$/.test(isbn) && !/^[0-9]{13}$/.test(isbn)) throw new Error('Invalid ISBN');
+
+    return new Promise((resolve, reject) => {
+        db.all(`SELECT isbn, user, stars, text, date FROM Review WHERE isbn = ?`, isbn, (err, rows) => {
+            if(err) reject(err);
+            // const books = [];
+            // rows.forEach(row => books[row.isbn] = row);
+            resolve(rows);
+        });
+    });
+}
+
 module.exports = {
     getBooks,
-    insertBooks
+    insertBooks,
+    insertReview,
+    getReviews
 };
