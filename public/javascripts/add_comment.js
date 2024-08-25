@@ -1,13 +1,22 @@
+/**
+ * Si utilizza il bubbling come richiesto dalle specifiche tecniche.
+ */
+
+document.getElementById('book-details').addEventListener('submit', function(event) {
+    // event.stopPropagation();
+    const element = document.getElementById('comments-list-empty');
+    if(element)
+    {
+        element.remove();
+    }
+});
+
 document.getElementById('add-comment-form').addEventListener('submit', async function(e) {
     e.preventDefault(); // Previeni il submit tradizionale del form
-
-    console.log("Form submitted!");
 
     const isbn = document.getElementById('isbn').value;
     const comment = document.getElementById('comment').value;
     const rate = document.getElementById('rate').value;
-
-    console.log({isbn, comment, rate});
 
     try {
         const response = await fetch('/add-comment', {

@@ -12,7 +12,7 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">
-        <img src="images/logo.png" alt="Logo" style="max-width: 40px; height: auto;">
+        <img src="images/logo.png" class="logo" alt="Logo">
         Recensioni di Libri
       </a>
       <div class="collapse navbar-collapse" id="navbarNav">
@@ -25,7 +25,7 @@
               <a class="nav-link" href="/logout">Disconnettiti</a>
             </li>
             <li class="nav-item">
-              <img src="<%= user.profilePicture %>" alt="Profile Picture" style="max-width: 40px; height: auto; border-radius: 50%;">
+              <img src="<%= user.profilePicture %>" class="pro-pic" alt="Profile Picture">
             </li>
           <% } else { %>
             <li class="nav-item">
@@ -44,8 +44,9 @@
   <div class="jumbotron text-center bg-light p-5">
     <h1 class="display-4">Benvenuto su Recensioni di Libri</h1>
     <p class="lead">Cerca recensioni di libri e condividi le tue opinioni con altri lettori.</p>
-    <form class="d-flex justify-content-center" action="libro.html">
-      <input class="form-control me-2" type="search" placeholder="Cerca un libro..." aria-label="Search" name="titolo">
+    <form class="d-flex justify-content-center" action="/search-title" method="GET">
+      <input id="search-field" class="form-control me-2" type="search" placeholder="Cerca un libro..." aria-label="Cerca" name="title" list="suggestions">
+      <datalist id="suggestions"></datalist>
       <button class="btn btn-primary" type="submit">Cerca</button>
     </form>
   </div>
@@ -57,7 +58,7 @@
       <% for(const [isbn, book] of Object.entries(books)) { %>
         <div class="col-md-4">
           <div class="card mb-4">
-            <img src="<%= book.cover_path %>" class="card-img-top" alt="Copertina <%= book.title %>" style="width: 100%; height: 300px; object-fit: cover;">
+            <img src="<%= book.cover_path %>" class="book-cover" alt="Copertina <%= book.title %>">
             <div class="card-body">
               <h5 class="card-title"><%= book.title %></h5>
               <p class="card-text">
@@ -81,5 +82,6 @@
   <footer class="bg-dark py-3 mt-4"></footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/javascripts/autocomplete_title.js"></script>
 </body>
 </html>

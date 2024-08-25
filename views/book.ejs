@@ -12,7 +12,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <div class="container-fluid">
     <a class="navbar-brand" href="#">
-      <img src="/images/logo.png" alt="Logo" style="max-width: 40px; height: auto;">
+      <img src="/images/logo.png" class="logo" alt="Logo">
       Recensioni di Libri
     </a>
     <div class="collapse navbar-collapse" id="navbarNav">
@@ -25,7 +25,7 @@
             <a class="nav-link" href="/logout">Disconnettiti</a>
           </li>
           <li class="nav-item">
-            <img src="<%= user.profilePicture %>" alt="Profile Picture" style="max-width: 40px; height: auto; border-radius: 50%;">
+            <img src="<%= user.profilePicture %>" class="pro-pic" alt="Profile Picture">
           </li>
         <% } else { %>
           <li class="nav-item">
@@ -52,7 +52,7 @@
 <div class="container">
   <div class="row">
     <!-- Book Details -->
-    <div class="col-12">
+    <div id="book-details" class="col-12">
       <h2 class="my-4"><%= book.title %></h2>
       <p>
         <strong><%= book.authors.includes(', ') ? 'Autori' : 'Autore' %>:</strong> <%= book.authors %><br>
@@ -65,7 +65,7 @@
       <h3>Recensioni</h3>
       <div id="comments-list">
         <% if (reviews.length === 0) { %>
-          <p>Non ci sono ancora recensioni per questo libro.</p>
+          <p id="comments-list-empty">Non ci sono ancora recensioni per questo libro.</p>
         <% } else { %>
           <% reviews.forEach(review => { %>
             <div class="review card mb-4">
@@ -106,7 +106,7 @@
             </select>
           </div>
           <input id="isbn" type="hidden" name="isbn" value="<%= book.isbn %>">
-          <button type="submit" class="btn btn-primary">Invia Commento</button>
+          <button id="comment-button" type="submit" class="btn btn-primary">Invia Commento</button>
         </form>
       <% } else { %>
         <p class="mt-4 text-danger">Effettua l'accesso per aggiungere un commento.</p>

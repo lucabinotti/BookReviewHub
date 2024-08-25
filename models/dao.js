@@ -2,7 +2,7 @@
 const fs = require('fs');
 const sqlite = require('sqlite3').verbose();
 
-const DEL_DB = true;
+const DEL_DB = false;
 
 if (DEL_DB && fs.existsSync('data/db.sqlite')) {
     fs.unlinkSync('data/db.sqlite');
@@ -13,7 +13,7 @@ const db = new sqlite.Database('data/db.sqlite', (err) => {
     if (err) throw err;
 });
 
-db.run('CREATE TABLE IF NOT EXISTS Book (isbn VARCHAR(13) PRIMARY KEY, title VARCHAR(64) NOT NULL, authors VARCHAR(128) NOT NULL, publish_date VARCHAR(16) NOT NULL, publishers VARCHAR(128) NOT NULL, cover_path VARCHAR(64) NOT NULL);');
+db.run('CREATE TABLE IF NOT EXISTS Book (isbn VARCHAR(13) PRIMARY KEY, title VARCHAR(64) NOT NULL, authors VARCHAR(128) DEFAULT NULL, publish_date VARCHAR(16) NOT NULL, publishers VARCHAR(128) DEFAULT NULL, cover_path VARCHAR(64) NOT NULL);');
 db.run('CREATE TABLE IF NOT EXISTS Review (isbn VARCHAR(13), user INT UNSIGNED, stars TINYINT NOT NULL, text VARCHAR(256) DEFAULT NULL, date TEXT NOT NULL, PRIMARY KEY(isbn, user));')
 
 /**
@@ -36,9 +36,9 @@ function insertBooks(books)
     {
         if(typeof book.isbn !== 'string' || !/^[0-9]{9}[0-9X]$/.test(book.isbn) && !/^[0-9]{13}$/.test(book.isbn)) throw new Error('Invalid ISBN');
         if(typeof book.title !== 'string' || book.title.trim() === '') throw new Error('Invalid title');
-        if(typeof book.authors !== 'string' || book.authors.trim() === '') throw new Error('Invalid authors');
+        if(book.authors !== null && (typeof book.authors !== 'string' || book.authors.trim() === '')) throw new Error('Invalid authors');
         if(typeof book.publish_date !== 'string' || book.publish_date.trim() === '') throw new Error('Invalid publish date');
-        if(typeof book.publishers !== 'string' || book.publishers.trim() === '') throw new Error('Invalid publishers');
+        if(book.publishers !== null && (typeof book.publishers !== 'string' || book.publishers.trim() === '')) throw new Error('Invalid publishers');
         if(typeof book.cover_path !== 'string' || book.cover_path.trim() === '') throw new Error('Invalid cover path');
 
         params.push(book.isbn, book.title, book.authors, book.publish_date, book.publishers, book.cover_path);
@@ -90,9 +90,24 @@ async function getReviews(isbn)
     });
 }
 
+async function getSimilarBooks(title)
+{
+    if(typeof title !== 'string') throw new Error('Invalid title');
+
+    return new Promise((resolve, reject) => {
+        db.all(`SELECT title FROM Book WHERE title LIKE ? LIMIT 10`, `%${title}%`, (err, rows) => {
+            if(err) reject(err);
+            // const books = [];
+            // rows.forEach(row => books[row.isbn] = row);
+            resolve(rows);
+        });
+    });
+}
+
 module.exports = {
     getBooks,
     insertBooks,
     insertReview,
-    getReviews
+    getReviews,
+    getSimilarBooks
 };
