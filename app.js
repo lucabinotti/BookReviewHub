@@ -1,247 +1,82 @@
-"use strict";
+'use strict';
 
-const fs = require('fs');
-const url = require('url');
-const https = require('https');
-const express = require('express');
-const { query, validationResult } = require('express-validator');
 const path = require('path');
 const passport = require('passport');
-const LocalStrategy = require('passport-local').Strategy;
-const session = require('express-session');
-const {getBooks, insertBooks, insertReview, getReviews, getSimilarBooks} = require('./models/dao');
+const {app, port} = require('./init');
+const {validationResult} = require('express-validator');
+const {fetchBooks, fetchBooksInBackground, searchBook, searchTitles} = require('./books');
+const {getUser, getUserId, updateUserIsMod, getBooks, insertBooks, getMostCommentedBooks, insertReview, getReviews, doesReviewExists, deleteReview} = require('./models/dao');
 
-// Spostare in init
-
-// Init application
-const app = express();
-
-// Per gestire le sessioni degli utenti
-app.use(session({
-    secret: 'RA99J0YX3s6Jjjy0D0e6qpGgA',
-    resave: false,
-    saveUninitialized: false
-}));
-
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-
-app.use('/images', express.static(path.join(__dirname, 'public/images')));
-app.use('/javascripts', express.static(path.join(__dirname, 'public/javascripts')));
-app.use('/css', express.static(path.join(__dirname, 'public/stylesheets')));
-
-// Init passport
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.use(new LocalStrategy((username, password, done) => {
-    User.findByUsername(username, (err, user) => {
-        if (err) { return done(err); }
-        if (!user) { return done(null, false, { message: 'Incorrect username.' }); }
-        if (!user.verifyPassword(password)) { return done(null, false, { message: 'Incorrect password.' }); }
-        return done(null, user);
-    });
-}));
-
-passport.serializeUser((user, done) => {
-    done(null, user.id);
-});
-
-passport.deserializeUser((id, done) => {
-    User.findById(id, (err, user) => {
-        done(err, user);
-    });
-});
-
-// serialize and de-serialize the user (user object <-> session)
-passport.serializeUser(function(user, done) {
-    done(null, user.id);
-});
-
-passport.deserializeUser(function(id, done) {
-    usersdao.getUser(id).then((user) => {
-        done(null, user);
-    })
-        .catch((err) => {
-            done(err, user);
-        });
-});
-
-app.post('/register', (req, res) => {
-    const { username, email, password } = req.body;
-    console.log({ username, email, password });
-    /*
-    User.create({ username, password }, (err, user) => {
-        if (err) {
-            res.status(500).send('Errore nella registrazione.');
-        } else {
-            res.redirect('/login');
-        }
-    });*/
-});
-
-// Route per il login
-app.post('/login', passport.authenticate('local', {
-    successRedirect: '/',
-    failureRedirect: '/login',
-    failureFlash: true // Se usi flash messages
-}));
-
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views/login.html'));
-});
-
-app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views/register.html'));
-});
-
-function downloadImage(imageUrl, path) {
-    return new Promise((resolve, reject) => {
-        const options = {
-            headers: {
-                'User-Agent': 'BookReviewHub/1.0'
-            }
-        };
-        https.get(imageUrl, options, (res) => {
-            if (res.statusCode === 302) {
-                // Segui il reindirizzamento
-                const redirectUrl = url.resolve(imageUrl, res.headers.location);
-                downloadImage(redirectUrl, path).then(resolve).catch(reject);
-            } else if (res.statusCode !== 200) {
-                reject(new Error(`Failed to get '${imageUrl}' (${res.statusCode})`));
-            } else {
-                const file = fs.createWriteStream(path);
-                res.pipe(file);
-                file.on('finish', () => {
-                    file.close(resolve);
-                });
-            }
-        }).on('error', (err) => {
-            fs.unlink(path, () => reject(err)); // Elimina il file se c'è un errore
-        });
-    });
-}
-
-
-async function fetchBooks(isbns)
-{
-    // isbns.forEach(isbn => (isBookNew(isbn) ? newBooks : books).push(isbn));
-    const response = await fetch(`https://openlibrary.org/api/books?bibkeys=${isbns.map(isbn => `ISBN:${isbn}`).join(',')}&jscmd=data&format=json`, {
-        method: 'GET',
-        headers: {'User-Agent': 'BookReviewHub/1.0'}
-    });
-    if (!response.ok)
-    {
-        throw new Error('Network response was not ok');
-    }
-    const data = await response.json();
-
-    const books = {};
-    for(const [isbn, book] of Object.entries(data))
-    {
-        let cover_path;
-        if(book.cover !== undefined)
-        {
-            cover_path = `/images/covers/isbn${isbn.slice(5)}.jpg`;
-            await downloadImage(book.cover.large, 'public' + cover_path);
-        }
-        else
-        {
-            cover_path = '/images/covers/default.jpg';
-        }
-        // TODO fix se non ci sono autori o pubblicatori
-        books[isbn.slice(5)] = {
-            isbn: isbn.slice(5),
-            title: book.title,
-            authors: book.authors === undefined ? "null" : book.authors.map(author => author.name).join(', '),
-            publish_date: book.publish_date,
-            publishers: book.publishers === undefined ? "null" : book.publishers.map(publisher => publisher.name).join(', '),
-            cover_path: cover_path
-        };
-    }
-
-    return books;
-}
-
-// TODO speed up che cerca prima nel db locale
-async function searchBook(title)
-{
-    const response = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=10`, {
-        method: 'GET',
-        headers: {'User-Agent': 'BookReviewHub/1.0'}
-    });
-    if(!response.ok)
-    {
-        throw new Error('Network response was not ok');
-    }
-    const data = await response.json();
-    if(data.numFound > 0)
-    {
-        // Il primo libro in ordine che ha un isbn valido, operatore ?. per non dare errore se son tutti undefined
-        const isbns = data.docs.find(doc => doc.isbn !== undefined)?.isbn;
-        if(isbns !== undefined) {
-            const books = await fetchBooks([isbns[0]]);
-            return books[Object.keys(books)[0]];
-        }
-    }
-    return null;
-}
 
 /**
- * Restituisce titoli simili a title
- * @param title
- * @returns {Promise<void>} {isbn: title, ...}
+ * Rotta per avviare autenticazione GitHub
  */
-async function searchTitles(title)
-{
-    const response = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=10`, {
-        method: 'GET',
-        headers: {'User-Agent': 'BookReviewHub/1.0'}
+app.get('/auth/github', passport.authenticate('github', {scope: ['user:email']}));
+
+/**
+ * Rotta di callback dove GitHub ti rimanda dopo il login
+ */
+app.get('/auth/github/callback',
+    passport.authenticate('github', {failureRedirect: '/login'}),
+    function(req, res) {
+        // Login riuscito, reindirizza l'utente
+        res.redirect('/');
+    }
+);
+
+/**
+ * Endpoint per il logout
+ */
+app.get('/logout-user', (req, res) => {
+    req.logout(() => {
+        // res.redirect('/');
+        res.json({success: true});
     });
-    if(!response.ok)
-    {
-        throw new Error('Network response was not ok');
-    }
-    const data = await response.json();
-    if(data.numFound > 0)
-    {
-        const titles = {};
-        data.docs.forEach(doc => {
-            if(doc.isbn !== undefined)
-            {
-                titles[doc.isbn[0]] = doc.title;
-            }
-        });
-        return titles;
-    }
-    return null;
-}
-
-/*
-https://openlibrary.org/search.json?title=cacca
-http://openlibrary.org/api/books?bibkeys=ISBN:1408294222&format=json&jscmd=data
-
- */
-app.get('/', async (req, res) => {
-
-    // L'utente è connesso?
-    // const user = {connected: false}
-    const user = {connected: true, profilePicture: 'images/propic.png'};
-    const isbns = ['8835088585', '1408294222', '8821561577'];
-    const oldBooks = await getBooks(isbns);
-    const newBooks = await fetchBooks(isbns.filter(isbn => !oldBooks.hasOwnProperty(isbn)));
-    if(Object.keys(newBooks).length !== 0) insertBooks(newBooks);
-    const books = Object.assign({}, oldBooks, newBooks);
-    // const books = isbns.map(isbn => mostRatedBooks[`ISBN:${isbn}`]);
-
-    // From db
-    // const books = await getBooks(isbns);
-    //     const newBooks = isbns.filter(isbn => !books.hasOwnProperty(isbn));
-
-    res.render(path.join(__dirname, 'views/index.ejs'), {user, books});
 });
 
-app.get('/books/:bookId', async (req, res) => {
+/**
+ * Questo endpoint controlla se l'utente e' autenticato, e restituisce le sue informazioni
+ */
+app.get('/is-auth', async (req, res) => {
+    if(!req.isAuthenticated())
+    {
+        res.status(200).json({auth: false});
+    }
+    else
+    {
+        res.status(200).json(req.user);
+    }
+});
+
+/**
+ * Da usare per impostare l'utente loggato a moderatore, per testare le funzionalita' da moderatore
+ */
+app.get('/mod', async (req, res) => {
+    if(req.isAuthenticated())
+    {
+        updateUserIsMod(req.user.id, true);
+        res.status(200).json({message: 'Sei stato promosso a moderatore.'});
+    }
+    else res.status(200).json({message: 'Non sei autenticato.'});
+});
+
+/**
+ * Da usare per impostare l'utente loggato a utente normale, per testare le funzionalita' da moderatore
+ */
+app.get('/unmod', async (req, res) => {
+    if(req.isAuthenticated())
+    {
+        updateUserIsMod(req.user.id, false);
+        res.status(200).json({message: 'Sei stato tolto dai moderatori.'});
+    }
+    else res.status(200).json({message: 'Non sei autenticato.'});
+});
+
+/**
+ * Recupera i dettagli di un libro specifico tramite ISBN e le recensioni associate.
+ * Se il libro non è presente nel database viene recuperato con API esterne.
+ */
+app.get('/get-books/:bookId', async (req, res) => {
     let book;
     const queriedBooks = await getBooks([req.params.bookId]);
 
@@ -254,29 +89,52 @@ app.get('/books/:bookId', async (req, res) => {
     }
     else book = queriedBooks[req.params.bookId];
 
-    const user = {connected: true, profilePicture: '/images/propic.png'};
-    const daoReviews = await getReviews(req.params.bookId);
+    if(book !== undefined)
+    {
+        // const user = {connected: true, profilePicture: '/images/propic.png'};
+        const daoReviews = await getReviews(req.params.bookId);
+        await getUser(daoReviews.user)
+        const reviewsPromises = daoReviews.map(async ({ user: username, date: datetime, text: comment, stars: rate }) => {
+            const userObject = await getUser(username);
+            return {
+                // username: userObject !== undefined ? userObject.username : undefined,
+                username: userObject?.username,
+                datetime,
+                comment,
+                rate
+            };
+        });
+        const reviews = await Promise.all(reviewsPromises);
+        res.json({book, reviews});
+    }
+    else res.status(404).json({success: false, message: 'Libro non trovato'});
 
-    const reviews = daoReviews.map(({ user: username, date: datetime, text: comment, stars: rate }) => ({ username, datetime, comment, rate }));
-
-    res.render(path.join(__dirname, 'views/book.ejs'), {user, book, reviews});
 });
 
-// TODO speed up si salvano gia nel db questi risultati consigliando i 3 libri piu simili richiesti tramite api
+/**
+ * Recupera i libri più commentati dal database e restituisce i dettagli.
+ */
+app.get('/most-commented-books', async (req, res) => {
+    const isbns = await getMostCommentedBooks();  // ['8835088585', '1408294222', '8821561577'];
+    const books = await getBooks(isbns);
+    res.json(books);
+});
+
+/**
+ * Autocompleta i titoli di libri in base a una query passata come parametro.
+ */
 app.get('/autocomplete-title', async (req, res) => {
     const errors = validationResult(req);
     if(!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { title } = req.query;
-
+    const {title} = req.query;
     try
     {
-        // const resultss = await getSimilarBooks(title);
-
         const results = await searchTitles(title);
 
         if(results !== null)
         {
+            fetchBooksInBackground(Object.keys(results)).catch(error => console.error(error));
             res.json(Object.values(results).map(value => ({ title: value })));
         }
         else res.json({});
@@ -284,50 +142,109 @@ app.get('/autocomplete-title', async (req, res) => {
     catch(error)
     {
         console.error('Error executing query', error);
-        res.status(500).send('Internal Server Error');
+        res.status(500).json({error: 'Internal Server Error'});
     }
 });
 
+/**
+ * Cerca un libro in base al titolo e reindirizza alla pagina del libro se trovato.
+ */
 app.get('/search-title', async (req, res) => {
     const errors = validationResult(req);
-    if(!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    if(!errors.isEmpty()) return res.status(400).json({errors: errors.array()});
 
     const { title } = req.query;
-
     try
     {
-        // res.json(book);
-
         const book = await searchBook(title);
         if(book !== null)
         {
-            const user = {connected: true, profilePicture: '/images/propic.png'};
-            const daoReviews = await getReviews(book.isbn);
-
-            const reviews = daoReviews.map(({ user: username, date: datetime, text: comment, stars: rate }) => ({ username, datetime, comment, rate }));
-
-            res.render(path.join(__dirname, 'views/book.ejs'), {user, book, reviews});
+            // Si vuole eseguire il redirect client-side cosi' da non refreshare la pagina
+            // res.redirect(`/books/${book.isbn}`);
+            res.status(200).json({redirect: true, url: `/books/${book.isbn}`});
         }
-        else res.status(200).send('Libro non trovato');
+        else res.status(404).send({redirect: false, message: 'Libro non trovato'});
     }
     catch(error)
     {
         console.error('Error executing query', error);
-        res.status(500).send('Internal Server Error');
+        res.status(500).json({redirect: false, message: 'Internal Server Error'});
     }
 });
 
-app.post('/add-comment', (req, res) => {
+/**
+ * Aggiunge un commento a un libro specifico.
+ * Richiede che l'utente sia autenticato.
+ */
+app.post('/add-comment', async (req, res) => {
     const {isbn, comment, rate} = req.body;
-    // const username = req.user.username; // Assicurati che `req.user` sia popolato quando l'utente è autenticato
 
-    insertReview(isbn, Number(isbn), Number(rate), comment);
-    res.status(201).json({
-        username: Number(isbn),
-        datetime: new Date().toISOString(), // Puoi usare il formato desiderato
-        comment,
-        rate: Number(rate)
-    });
+    if(!req.isAuthenticated())
+    {
+        res.status(401).json(false);
+    }
+    else
+    {
+        const user = await getUser(req.user.id);
+        if(user !== undefined)
+        {
+            if(!(await doesReviewExists(isbn, user.id)))
+            {
+                insertReview(isbn, user.id, Number(rate), comment);
+                res.status(201).json({
+                    username: user.username,
+                    datetime: new Date().toISOString(),
+                    comment,
+                    rate: Number(rate)
+                });
+            }
+            else
+            {
+                res.status(409).json({success: false, message: 'Hai già inserito una recensione, non puoi farne un\'altra'});
+            }
+        }
+        else res.status(401).json(false);
+    }
 });
 
-app.listen(3000, () => console.log('Running on http://127.0.0.1:3000'));
+/**
+ * Cancella una recensione di un libro specifico in base all'ISBN e all'username.
+ * Solo un moderatore può eseguire questa operazione.
+ */
+app.delete('/delete-comment/:isbn/:username', async (req, res) => {
+    const username = req.params.username;
+    const isbn = req.params.isbn;
+    if(req.isAuthenticated())
+    {
+        const user = await getUser(req.user.id);
+        if(user !== undefined)
+        {
+            if(user.is_mod)
+            {
+                const userId = await getUserId(username);
+                if(userId !== undefined)
+                {
+                    if(await doesReviewExists(isbn, userId.id))
+                    {
+                        deleteReview(isbn, userId.id);
+                        res.status(200).json({success: true, message: 'Recensione cancellata'});
+                    }
+                    else res.status(404).json({success: false, message: 'La recensione non esiste'});
+                }
+                else res.status(404).json({success: false, message: 'L\'username non esiste'});
+            }
+            else res.status(403).json({success: false, message: 'Non sei un moderatore'});
+        }
+        else res.status(403).json({success: false, message: 'Autenticazione non valida'});
+    }
+    else res.status(403).json({success: false, message: 'Non sei autenticato'});
+});
+
+/**
+ * Gestisce tutte le altre richieste e restituisce il file index.html per il routing client-side.
+ */
+app.get('*', async (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.listen(port, () => console.log(`Running on http://127.0.0.1:${port}`));

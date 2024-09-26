@@ -1,14 +1,12 @@
+"use strict";
+
 /**
  * Si utilizza il bubbling come richiesto dalle specifiche tecniche.
  */
 
 document.getElementById('book-details').addEventListener('submit', function(event) {
     // event.stopPropagation();
-    const element = document.getElementById('comments-list-empty');
-    if(element)
-    {
-        element.remove();
-    }
+    document.getElementById('comments-list-empty').classList.remove('active');
 });
 
 document.getElementById('add-comment-form').addEventListener('submit', async function(e) {
@@ -18,7 +16,8 @@ document.getElementById('add-comment-form').addEventListener('submit', async fun
     const comment = document.getElementById('comment').value;
     const rate = document.getElementById('rate').value;
 
-    try {
+    try
+    {
         const response = await fetch('/add-comment', {
             method: 'POST',
             headers: {
@@ -27,7 +26,8 @@ document.getElementById('add-comment-form').addEventListener('submit', async fun
             body: JSON.stringify({ isbn, comment, rate })
         });
 
-        if (response.status === 201) {
+        if(response.status === 201)
+        {
             const newComment = await response.json();
 
             // Aggiorna il DOM con il nuovo commento
@@ -69,12 +69,20 @@ document.getElementById('add-comment-form').addEventListener('submit', async fun
             // Aggiungi il nuovo commento alla lista dei commenti
             commentsList.appendChild(newCommentElement);
 
+            // Imposta la scritta che l'utente ha gia' recensito il libro e rimuovi il form di input
+            document.getElementById('add-comment-form').classList.remove('active');
+            document.getElementById('already-commented').classList.add('active');
+
             // Reset del form
             document.getElementById('add-comment-form').reset();
-        } else {
-            console.error('Failed to add comment');
         }
-    } catch (error) {
+        else
+        {
+            console.error(`Failed to add comment [${response.status}]`);
+        }
+    }
+    catch(error)
+    {
         console.error('Error:', error);
     }
 });

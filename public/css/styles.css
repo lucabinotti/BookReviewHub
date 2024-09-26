@@ -54,3 +54,30 @@ footer {
   height: 300px;
   object-fit: cover;
 }
+
+.hidden {
+  display: none; /* Tutte le sezioni sono inizialmente nascoste */
+}
+
+.hidden.active {
+  display: block; /* Sezione visibile quando attiva */
+}
+
+.delete-section {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.delete-text {
+  color: red;
+  font-size: 16px;
+  margin-right: 10px; /* Margine destro per distanziare la scritta dalla croce */
+}
+
+.delete-cross {
+  font-size: 20px;
+  color: red;
+  cursor: pointer;
+}
