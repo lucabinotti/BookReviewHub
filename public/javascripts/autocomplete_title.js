@@ -3,7 +3,7 @@
 // Dava problemi perche' arrivavano troppe richieste per ogni lettera digitata
 // document.getElementById('search-field').addEventListener('input', onInputSearch);
 
-const onInputSearchDebounced = debounce(onInputSearch, 5000);
+const onInputSearchDebounced = debounce(onInputSearch, 300);
 document.getElementById('search-field').addEventListener('input', onInputSearchDebounced);
 
 /**
