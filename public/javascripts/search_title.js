@@ -28,12 +28,16 @@ searchForm.addEventListener('submit', async (event) => {
             document.getElementById('book-menu').classList.remove('active');
 
             // Nascondi il div con id 'main'
-            document.getElementById('main').classList.remove('active');
+            // document.getElementById('main').classList.remove('active');
 
             // Mostra il div con id 'book-not-found'
             document.getElementById('book-not-found').classList.add('active');
         }
         else console.error('Errore imprevisto:', response.status);
+
+        // Svuota input utente
+        const searchField = document.getElementById('search-field');
+        searchField.value = '';
     }
     catch(error)
     {

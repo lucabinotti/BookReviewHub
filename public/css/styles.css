@@ -81,3 +81,9 @@ footer {
   color: red;
   cursor: pointer;
 }
+
+#book-not-found {
+  font-weight: bold;
+  font-size: 0.95em;
+  margin-top: 8px;
+}
